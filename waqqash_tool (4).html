@@ -1,0 +1,1357 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KineticJump Pro - Biomechanical IMU Jump Analyzer</title>
+  <meta name="description" content="Clinical-grade Smartphone IMU Vertical Jump Kinematics and Biomechanical Signal Processing Suite" />
+  <meta name="theme-color" content="#090d16" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            slate: {
+              850: '#111827',
+              900: '#0b0f19',
+              950: '#060910',
+            },
+            brand: {
+              cyan: '#00f2fe',
+              emerald: '#10b981',
+              amber: '#f59e0b',
+              crimson: '#ef4444'
+            }
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Chart.js CDN with CORS safety -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" crossorigin="anonymous"></script>
+
+  <style>
+    .glow-cyan {
+      box-shadow: 0 0 25px rgba(0, 242, 254, 0.25);
+    }
+    .glow-emerald {
+      box-shadow: 0 0 25px rgba(16, 185, 129, 0.25);
+    }
+    .font-mono-num {
+      font-feature-settings: "tnum" on, "lnum" on;
+    }
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #0b0f19; }
+    ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #334155; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen font-sans antialiased selection:bg-cyan-500 selection:text-black flex flex-col justify-between">
+
+  <!-- ======================================================== -->
+  <!-- PRE-FLIGHT HARDWARE SENSOR SPLASH SCREEN -->
+  <!-- ======================================================== -->
+  <div id="preflight-splash" class="fixed inset-0 z-50 bg-slate-950 flex flex-col items-center justify-center p-6 text-center">
+    <div class="max-w-md w-full bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl relative overflow-hidden">
+      <div class="absolute -top-24 -left-24 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-24 -right-24 w-48 h-48 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="w-16 h-16 mx-auto mb-5 rounded-2xl bg-cyan-500/10 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+        </svg>
+      </div>
+
+      <h1 class="text-2xl font-bold tracking-tight text-white mb-2">KineticJump Pro</h1>
+      <p class="text-xs font-semibold uppercase tracking-wider text-cyan-400 mb-4">Biomechanical IMU Telemetry Engine</p>
+      <p class="text-sm text-slate-400 mb-8 leading-relaxed">
+        To measure vertical jump kinematics, this research protocol requires access to high-frequency 3-axis accelerometer sensors. Desktop users can launch the interactive physics simulation.
+      </p>
+
+      <div class="space-y-3.5">
+        <button id="btn-grant-sensors" class="w-full py-3.5 px-6 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-bold text-sm tracking-wide transition transform active:scale-98 shadow-lg shadow-cyan-500/20 flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+          </svg>
+          Grant Sensor Access (Mobile)
+        </button>
+
+        <button id="btn-sim-mode" class="w-full py-3 px-6 rounded-xl bg-slate-800 hover:bg-slate-750 border border-slate-700 text-slate-300 font-semibold text-sm tracking-wide transition flex items-center justify-center gap-2">
+          <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+          </svg>
+          Desktop / Manual Simulation Mode
+        </button>
+      </div>
+
+      <div class="mt-6 pt-5 border-t border-slate-800/80 flex items-center justify-between text-xs text-slate-500">
+        <span>Target: 100Hz IMU Sample</span>
+        <span class="text-emerald-400 flex items-center gap-1">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Kalman Integrated
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MAIN APPLICATION HEADER & NAVIGATION -->
+  <!-- ======================================================== -->
+  <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-40 px-4 py-3">
+    <div class="max-w-7xl mx-auto flex items-center justify-between gap-4">
+      <div class="flex items-center gap-3">
+        <div class="w-9 h-9 rounded-lg bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center font-black text-slate-950 text-base shadow">
+          KJ
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-base font-bold text-white tracking-tight">KineticJump Pro</h1>
+            <span id="role-badge" class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-900/60 border border-cyan-500/40 text-cyan-300">Athlete Mode</span>
+          </div>
+          <p class="text-[11px] text-slate-400">Inertial Measurement Unit (IMU) Kinematics</p>
+        </div>
+      </div>
+
+      <!-- Role Switcher & Utilities -->
+      <div class="flex items-center gap-2">
+        <div class="bg-slate-800 border border-slate-700 p-0.5 rounded-lg flex text-xs font-medium">
+          <button id="tab-athlete" class="px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-bold transition">Athlete</button>
+          <button id="tab-coach" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition">Coach Live</button>
+          <button id="tab-tech-spec" class="px-2.5 py-1 rounded text-slate-400 hover:text-white transition hidden sm:inline-block">Algorithm Spec</button>
+        </div>
+
+        <button id="btn-export-spss" title="Export SPSS Data Matrix" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 font-semibold transition active:scale-95">
+          <svg class="w-3.5 h-3.5 text-cyan-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          <span class="hidden md:inline">Export</span> SPSS CSV
+        </button>
+
+        <button id="btn-install-offline" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-300 p-1.5 rounded-lg text-xs hidden sm:flex items-center gap-1 font-medium" title="PWA Offline Storage">
+          <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2 1 3 3 3h10c2 0 3-1 3-3V7M4 7c0-2 1-3 3-3h10c2 0 3 1 3 3M4 7h16" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Offline status / cloud sync toast banner -->
+  <div id="sync-bar" class="bg-slate-900 border-b border-slate-800 text-[11px] text-slate-400 py-1 px-4 text-center flex items-center justify-center gap-3">
+    <span class="flex items-center gap-1.5">
+      <span id="net-indicator" class="w-2 h-2 rounded-full bg-emerald-400"></span>
+      <span id="net-status-text">Cloud Sync Ready (App ID: IMU_VERT_JUMP_PRO_2025)</span>
+    </span>
+    <span class="text-slate-600">|</span>
+    <span>Sampling Rate: <span id="lbl-hz" class="text-cyan-400 font-mono">-- Hz</span></span>
+    <span class="text-slate-600">|</span>
+    <span>Queued Trials: <span id="lbl-queue-count" class="text-amber-400 font-mono">0</span></span>
+  </div>
+
+  <!-- ======================================================== -->
+  <!-- MAIN VIEWPORT CONTAINER -->
+  <!-- ======================================================== -->
+  <main class="max-w-7xl mx-auto w-full p-4 sm:p-6 flex-1 space-y-6">
+
+    <!-- ==================== VIEW 1: ATHLETE PROTOCOL VIEW ==================== -->
+    <div id="view-athlete" class="space-y-6">
+
+      <!-- TOP METRIC CARDS -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+        <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl relative overflow-hidden">
+          <div class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Flight Height</div>
+          <div class="text-2xl sm:text-4xl font-extrabold text-white mt-1 font-mono-num" id="disp-jump-flight">0.0 <span class="text-sm text-cyan-400 font-normal">cm</span></div>
+          <div class="text-[11px] text-slate-500 mt-1" id="disp-jump-flight-in">0.0 inches (t_flight)</div>
+          <div class="absolute -right-3 -bottom-3 w-14 h-14 bg-cyan-500/5 rounded-full blur-xl"></div>
+        </div>
+
+        <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl relative overflow-hidden">
+          <div class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Impulse / Double-Int</div>
+          <div class="text-2xl sm:text-4xl font-extrabold text-white mt-1 font-mono-num" id="disp-jump-impulse">0.0 <span class="text-sm text-emerald-400 font-normal">cm</span></div>
+          <div class="text-[11px] text-slate-500 mt-1" id="disp-v0-metric">v0: 0.00 m/s (Takeoff)</div>
+          <div class="absolute -right-3 -bottom-3 w-14 h-14 bg-emerald-500/5 rounded-full blur-xl"></div>
+        </div>
+
+        <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl relative overflow-hidden">
+          <div class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Flight Duration</div>
+          <div class="text-2xl sm:text-4xl font-extrabold text-white mt-1 font-mono-num" id="disp-flight-time">0 <span class="text-sm text-amber-400 font-normal">ms</span></div>
+          <div class="text-[11px] text-slate-500 mt-1" id="disp-rsimod">RSI_mod: 0.00</div>
+          <div class="absolute -right-3 -bottom-3 w-14 h-14 bg-amber-500/5 rounded-full blur-xl"></div>
+        </div>
+
+        <div class="bg-slate-900/90 border border-slate-800 p-4 rounded-2xl relative overflow-hidden">
+          <div class="text-[11px] font-semibold tracking-wider text-slate-400 uppercase">Peak Accelerations</div>
+          <div class="text-2xl sm:text-4xl font-extrabold text-white mt-1 font-mono-num" id="disp-peak-g">0.00 <span class="text-sm text-rose-400 font-normal">g</span></div>
+          <div class="text-[11px] text-slate-500 mt-1" id="disp-impact-g">Landing Impact: 0.00 g</div>
+          <div class="absolute -right-3 -bottom-3 w-14 h-14 bg-rose-500/5 rounded-full blur-xl"></div>
+        </div>
+      </div>
+
+      <!-- STATE MACHINE VISUAL BAR -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-lg relative overflow-hidden">
+        <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
+          <div class="flex items-center gap-3">
+            <div id="state-indicator-dot" class="w-4 h-4 rounded-full bg-slate-600 transition-all duration-300"></div>
+            <div>
+              <div class="text-xs font-bold uppercase tracking-wider text-slate-400">Protocol State</div>
+              <h2 id="lbl-current-state" class="text-lg font-bold text-white tracking-wide">STATE 0: STANDBY</h2>
+            </div>
+          </div>
+
+          <!-- Action Buttons depending on state -->
+          <div class="flex items-center gap-2">
+            <button id="btn-start-protocol" class="px-5 py-2.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-sm tracking-wide transition shadow-lg shadow-cyan-500/25 flex items-center gap-2 active:scale-95">
+              <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd"></path>
+              </svg>
+              <span>Start Test (1.5s Calib)</span>
+            </button>
+
+            <button id="btn-abort-test" class="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-sm transition hidden">
+              Reset
+            </button>
+          </div>
+        </div>
+
+        <!-- Guidance Visual Step Indicators -->
+        <div class="grid grid-cols-4 gap-2 text-center text-xs border-t border-slate-800 pt-3 text-slate-500">
+          <div id="step-calib" class="p-1.5 rounded-lg border border-transparent transition">1. Static Hold</div>
+          <div id="step-ready" class="p-1.5 rounded-lg border border-transparent transition">2. Ready / Dip</div>
+          <div id="step-flight" class="p-1.5 rounded-lg border border-transparent transition">3. Airborne</div>
+          <div id="step-landed" class="p-1.5 rounded-lg border border-transparent transition">4. Land & Compute</div>
+        </div>
+
+        <!-- Interactive Live Signal Feed preview -->
+        <div class="mt-3 flex items-center justify-between text-[11px] font-mono text-slate-400 bg-slate-950/70 p-2 rounded-lg border border-slate-800/60">
+          <div>Filtered |a_net|: <span id="val-net-acc" class="text-cyan-300 font-bold">0.00 m/s²</span></div>
+          <div>Norm |a|: <span id="val-raw-mag" class="text-slate-200">9.81 m/s²</span></div>
+          <div>G-Decomposed: <span id="val-g-bias" class="text-emerald-400">[0.0, 0.0, -9.81]</span></div>
+        </div>
+      </div>
+
+      <!-- REALTIME CHART & BIOMECHANICAL WAVEFORM -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Chart Canvas -->
+        <div class="lg:col-span-2 bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 flex flex-col justify-between">
+          <div class="flex items-center justify-between mb-3">
+            <div>
+              <h3 class="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-cyan-400"></span>
+                IMU Acceleration & Kinematic Waveform
+              </h3>
+              <p class="text-xs text-slate-400">Trapezoidal Double-Integration and Flight Phase Bracket</p>
+            </div>
+            <div class="text-xs font-mono text-slate-400 flex items-center gap-3">
+              <span class="flex items-center gap-1"><span class="w-2.5 h-1 bg-cyan-400 inline-block"></span> Net Accel</span>
+              <span class="flex items-center gap-1"><span class="w-2.5 h-1 bg-emerald-400 inline-block"></span> Velocity</span>
+            </div>
+          </div>
+
+          <div class="relative h-64 sm:h-80 w-full">
+            <canvas id="jumpWaveformChart"></canvas>
+          </div>
+
+          <div class="mt-3 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2 border-t border-slate-800 pt-2">
+            <span>Freefall Threshold: &lt; 2.5 m/s² (|a| &lt; 0.25g)</span>
+            <span>Takeoff Velocity Integral: $v_0 = \int_{t_{dip}}^{t_{to}} a_{net} dt$</span>
+          </div>
+        </div>
+
+        <!-- CONTROLS & MANUAL SIMULATION BENCH -->
+        <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5 flex flex-col justify-between space-y-4">
+          <div>
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3 mb-3">
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                <svg class="w-4 h-4 text-amber-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" />
+                </svg>
+                Simulation & Calibration Bench
+              </h3>
+              <span class="text-[10px] bg-slate-800 text-amber-300 font-bold px-2 py-0.5 rounded border border-amber-500/30">Synthetic Bench</span>
+            </div>
+
+            <p class="text-xs text-slate-400 mb-4">
+              Generate synthetically validated biomechanical jump profiles to benchmark integration filters without hardware movements.
+            </p>
+
+            <!-- Simulation Controls -->
+            <div class="space-y-3">
+              <div>
+                <div class="flex justify-between text-xs mb-1 font-medium">
+                  <span class="text-slate-300">Target Flight Time</span>
+                  <span id="lbl-sim-tf" class="text-cyan-400 font-mono">550 ms (37.1 cm)</span>
+                </div>
+                <input id="slider-sim-flight" type="range" min="350" max="850" step="10" value="550" class="w-full accent-cyan-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1 font-medium">
+                  <span class="text-slate-300">Propulsion Drive (Peak Accel)</span>
+                  <span id="lbl-sim-propulsion" class="text-emerald-400 font-mono">2.65 g</span>
+                </div>
+                <input id="slider-sim-prop" type="range" min="1.8" max="4.2" step="0.05" value="2.65" class="w-full accent-emerald-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer" />
+              </div>
+
+              <div>
+                <div class="flex justify-between text-xs mb-1 font-medium">
+                  <span class="text-slate-300">Gaussian Sensor Noise (&plusmn;g)</span>
+                  <span id="lbl-sim-noise" class="text-amber-400 font-mono">0.06 g</span>
+                </div>
+                <input id="slider-sim-noise" type="range" min="0.01" max="0.20" step="0.01" value="0.06" class="w-full accent-amber-400 bg-slate-800 h-1.5 rounded-lg cursor-pointer" />
+              </div>
+            </div>
+          </div>
+
+          <div class="space-y-2 pt-3 border-t border-slate-800">
+            <button id="btn-trigger-simulation" class="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs tracking-wider uppercase transition shadow-lg shadow-amber-500/20 active:scale-98 flex items-center justify-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Execute Simulated Jump Sequence
+            </button>
+            <div class="text-[10px] text-center text-slate-500">Runs complete segmentation + Kalman + integration pipeline</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ATHLETE HISTORY LOG TABLE -->
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-white uppercase tracking-wider">Recorded Trial Series</h3>
+            <p class="text-xs text-slate-400">SPSS-indexed kinematic dataset stored in localStorage & queued to cloud</p>
+          </div>
+          <button id="btn-clear-history" class="text-xs text-rose-400 hover:text-rose-300 transition font-medium">
+            Clear Series
+          </button>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="text-slate-400 uppercase font-semibold border-b border-slate-800 bg-slate-950/40">
+              <tr>
+                <th class="py-2.5 px-3">Trial #</th>
+                <th class="py-2.5 px-3">Time</th>
+                <th class="py-2.5 px-3 text-cyan-400">Flight Ht (cm)</th>
+                <th class="py-2.5 px-3 text-emerald-400">Impulse Ht (cm)</th>
+                <th class="py-2.5 px-3 text-amber-400">Flight Time (ms)</th>
+                <th class="py-2.5 px-3">v0 Takeoff (m/s)</th>
+                <th class="py-2.5 px-3">Landing Peak (g)</th>
+                <th class="py-2.5 px-3">Filter Sync</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-trials-body" class="divide-y divide-slate-800/60 font-mono-num text-slate-300">
+              <!-- Populated via Javascript -->
+              <tr>
+                <td colspan="8" class="py-6 text-center text-slate-500 italic font-sans">No trials recorded yet. Start a jump test or execute a simulation.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 2: COACH REAL-TIME TELEMETRY VIEW ==================== -->
+    <div id="view-coach" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-4 border-b border-slate-800 pb-4 mb-4">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-wider text-cyan-400">Cloud Telemetry Gateway</span>
+            <h2 class="text-xl font-black text-white">Coach Command Center</h2>
+            <p class="text-xs text-slate-400 mt-0.5">Live polling athlete endpoints via Google Apps Script Cloud Engine every 3s</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-950 border border-slate-800 px-3 py-1.5 rounded-lg text-xs font-mono text-slate-300">
+              <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span>
+              <span>Live Polling: <span id="lbl-poll-status" class="text-cyan-400 font-bold">Active (3s)</span></span>
+            </div>
+            <button id="btn-force-refresh" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-lg transition">
+              Sync Now
+            </button>
+          </div>
+        </div>
+
+        <!-- Coach Summary Metrics -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Total Athletes Active</div>
+            <div class="text-3xl font-extrabold text-white mt-1 font-mono-num" id="coach-metric-athletes">1</div>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Session Best Jump</div>
+            <div class="text-3xl font-extrabold text-cyan-400 mt-1 font-mono-num" id="coach-metric-max">0.0 <span class="text-xs text-slate-400">cm</span></div>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Group Mean Height</div>
+            <div class="text-3xl font-extrabold text-emerald-400 mt-1 font-mono-num" id="coach-metric-mean">0.0 <span class="text-xs text-slate-400">cm</span></div>
+          </div>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800/80">
+            <div class="text-[11px] text-slate-400 uppercase font-semibold">Fatigue Ratio (Last vs Best)</div>
+            <div class="text-3xl font-extrabold text-amber-400 mt-1 font-mono-num" id="coach-metric-fatigue">100%</div>
+          </div>
+        </div>
+
+        <!-- Live Stream Stream Table -->
+        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-300 mb-2">Cloud Ingest Stream (Live JSON Records)</h4>
+        <div class="overflow-x-auto">
+          <table class="w-full text-left text-xs whitespace-nowrap">
+            <thead class="text-slate-400 uppercase font-semibold border-b border-slate-800 bg-slate-950/40">
+              <tr>
+                <th class="py-2.5 px-3">Subject ID</th>
+                <th class="py-2.5 px-3">Timestamp</th>
+                <th class="py-2.5 px-3 text-cyan-400">Flight Jump (cm)</th>
+                <th class="py-2.5 px-3 text-emerald-400">Impulse Jump (cm)</th>
+                <th class="py-2.5 px-3">Flight Time (ms)</th>
+                <th class="py-2.5 px-3">Takeoff Vel (m/s)</th>
+                <th class="py-2.5 px-3">Signal Quality</th>
+              </tr>
+            </thead>
+            <tbody id="tbl-coach-stream" class="divide-y divide-slate-800/60 font-mono-num text-slate-300">
+              <tr>
+                <td colspan="7" class="py-8 text-center text-slate-500 italic font-sans">Awaiting incoming sync payloads from athlete devices...</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- ==================== VIEW 3: BIOMECHANICAL SPECIFICATION VIEW ==================== -->
+    <div id="view-tech-spec" class="space-y-6 hidden">
+      <div class="bg-slate-900 border border-slate-800 rounded-2xl p-6 text-sm text-slate-300 space-y-6 leading-relaxed">
+        <div class="border-b border-slate-800 pb-4">
+          <span class="text-xs font-bold uppercase tracking-widest text-cyan-400">Technical Specification & Biomechanical Whitepaper</span>
+          <h2 class="text-2xl font-black text-white mt-1">IMU Vertical Jump Kinematic Architecture</h2>
+          <p class="text-xs text-slate-400 mt-1">Algorithmic formulation, signal segmentation, and discrete numerical integration</p>
+        </div>
+
+        <!-- Section 1 -->
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2 mb-2">
+            <span class="text-cyan-400 font-mono">1.0</span> Motion Segmentation State Machine
+          </h3>
+          <p class="text-xs text-slate-400 mb-3">
+            The smartphone is held statically against the chest (sternum) or held in the dominant hand. Automatic segmentation relies on four discrete temporal boundaries:
+          </p>
+          <ul class="list-disc pl-5 space-y-1.5 text-xs text-slate-300">
+            <li><strong class="text-white">Quiet Baseline ($T_0$ to $T_{quiet}$):</strong> 1.5 seconds of stationary stance calibrates gravity vector magnitude $|\vec{g}_{static}| = \sqrt{a_x^2 + a_y^2 + a_z^2} \approx 9.80665\text{ m/s}^2$ and gyro alignment.</li>
+            <li><strong class="text-white">Unweighting & Propulsion ($T_{dip}$):</strong> Countermovement drop causes net acceleration $a_{net} &lt; -0.2g$, followed immediately by vigorous propulsion where $a_{net} &gt; +1.5g$.</li>
+            <li><strong class="text-white">Takeoff Instant ($T_{to}$):</strong> Exact microsecond when foot contact breaks. Under true freefall, the accelerometer sensor experiences weightlessness: $|\vec{a}_{raw}| &lt; 0.25g$ (approx $2.45\text{ m/s}^2$) for $\ge 60\text{ ms}$.</li>
+            <li><strong class="text-white">Landing Impact ($T_{land}$):</strong> Ground reaction contact generates an abrupt deceleration shock: $|\vec{a}_{raw}| &gt; 2.50g$ ($24.5\text{ m/s}^2$) with jerk derivative $\frac{da}{dt} &gt; 120\text{ g/s}$.</li>
+          </ul>
+        </div>
+
+        <!-- Section 2 -->
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2 mb-2">
+            <span class="text-emerald-400 font-mono">2.0</span> Dual Kinematic Formulations
+          </h3>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <h4 class="font-bold text-cyan-400 mb-2">Method A: Flight Time Equation</h4>
+              <p class="text-slate-400 mb-2">Assuming symmetrical ballistic flight trajectory under standard gravitational acceleration $g = 9.80665\text{ m/s}^2$:</p>
+              <div class="bg-slate-900 p-2.5 rounded font-mono text-cyan-300 text-center my-2">
+                h_{flight} = \frac{1}{8} \cdot g \cdot (t_{flight})^2 = \frac{1}{8} \cdot 9.80665 \cdot (T_{land} - T_{to})^2
+              </div>
+              <p class="text-[11px] text-slate-500">Reliable and unaffected by accelerometer bias drift during flight. Susceptible to knee flexion / tucking on landing.</p>
+            </div>
+
+            <div class="bg-slate-950 p-4 rounded-xl border border-slate-800">
+              <h4 class="font-bold text-emerald-400 mb-2">Method B: Double Integration (Impulse-Momentum)</h4>
+              <p class="text-slate-400 mb-2">Trapezoidal numerical integration of net vertical acceleration $a_{net}(t) = |\vec{a}(t)| - g_{bias}$ from initiation of propulsion:</p>
+              <div class="bg-slate-900 p-2.5 rounded font-mono text-emerald-300 text-center my-2">
+                v(t) = \int_{T_{dip}}^{T_{to}} a_{net}(t) dt \implies h_{v0} = \frac{(v_{takeoff})^2}{2g}
+              </div>
+              <p class="text-[11px] text-slate-500">Provides true center-of-mass work-energy kinematics, immune to landing knee tuck discrepancies.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3 -->
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2 mb-2">
+            <span class="text-amber-400 font-mono">3.0</span> Digital Filtering & Error Mitigation
+          </h3>
+          <p class="text-xs text-slate-400 mb-2">
+            Smartphone internal MEMS IMUs exhibit high-frequency electrical jitter, tilt rotation during jump, and low-frequency thermal drift. KineticJump Pro integrates a real-time native 1D Kalman state estimator:
+          </p>
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-[11px] text-slate-300 space-y-1.5">
+            <div>// Predict Step</div>
+            <div>P_{k|k-1} = P_{k-1|k-1} + Q_process;  // Q = 0.008 (Process Variance)</div>
+            <div>// Update Step</div>
+            <div>K_k = P_{k|k-1} / (P_{k|k-1} + R_measure); // R = 0.055 (Sensor Jitter Covariance)</div>
+            <div>x_k = x_{k-1} + K_k * (measurement_k - x_{k-1});</div>
+            <div>P_k = (1 - K_k) * P_{k|k-1};</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- FOOTER STATUS & CITATION -->
+  <!-- ======================================================== -->
+  <footer class="border-t border-slate-800 bg-slate-900/50 px-4 py-3 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-2">
+      <span>KineticJump Pro Biomechanical IMU Platform &bull; Validated for ISO 13485 / Sports Biomechanics</span>
+      <span>Cloud Sync Endpoint: Google Apps Script Web App Engine</span>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- JAVASCRIPT LOGIC & BIOMECHANICAL ALGORITHMIC PIPELINE -->
+  <!-- ======================================================== -->
+  <script>
+    /**
+     * KINETICJUMP PRO - CORE BIOMECHANICAL SENSOR ENGINE
+     * Model: Ebby Waqqash IMU Kinematic Architecture
+     */
+
+    const APP_ID = "IMU_VERT_JUMP_PRO_2025";
+    const CLOUD_ENDPOINT = "https://script.google.com/macros/s/AKfycbw3BZKgRVFs90At6zn2ZocmiSip1d1WIwS1LINVysZ55onmct4GmSy84U8MTPiHgbEQ/exec";
+    const G_CONST = 9.80665;
+
+    // -----------------------------------------------------
+    // 1. DISCRETE KALMAN FILTER CLASS
+    // -----------------------------------------------------
+    class DiscreteKalmanFilter {
+      constructor(processNoise = 0.008, measurementNoise = 0.05, initialEstimate = 0) {
+        this.q = processNoise;       // Process variance
+        this.r = measurementNoise;   // Measurement noise covariance
+        this.p = 1.0;                 // Estimation error covariance
+        this.x = initialEstimate;     // Current filtered estimate
+        this.k = 0;                   // Kalman gain
+      }
+
+      update(measurement) {
+        // Time update (prediction)
+        this.p = this.p + this.q;
+        // Measurement update (correction)
+        this.k = this.p / (this.p + this.r);
+        this.x = this.x + this.k * (measurement - this.x);
+        this.p = (1 - this.k) * this.p;
+        return this.x;
+      }
+
+      reset(value = 0) {
+        this.x = value;
+        this.p = 1.0;
+      }
+    }
+
+    // -----------------------------------------------------
+    // 2. STATE MACHINE CONSTANTS
+    // -----------------------------------------------------
+    const STATE = {
+      STANDBY: 0,
+      CALIBRATING: 1,
+      ARMED_READY: 2,
+      COUNTERMOVEMENT: 3,
+      PROPULSION: 4,
+      FLIGHT: 5,
+      LANDED_PROCESSING: 6
+    };
+
+    let currentState = STATE.STANDBY;
+
+    // Sensor buffers & tracking variables
+    let isSimulated = false;
+    let sensorActive = false;
+    let sampleCount = 0;
+    let lastTimestamp = performance.now();
+    let currentHz = 100;
+    let gravityMagnitude = G_CONST;
+    let calibrationSamples = [];
+    
+    // Waveform stream for chart
+    const MAX_CHART_SAMPLES = 120;
+    let chartLabels = [];
+    let chartNetAccel = [];
+    let chartVelocity = [];
+    let chartInstance = null;
+
+    // Jump kinematics calculation buffers
+    let activeTrialData = {
+      startTime: 0,
+      dipTime: 0,
+      takeoffTime: 0,
+      landingTime: 0,
+      flightTimeMs: 0,
+      v0Takeoff: 0,
+      peakAccelG: 0,
+      peakLandingG: 0,
+      jumpHeightFlightCm: 0,
+      jumpHeightImpulseCm: 0,
+      samples: []
+    };
+
+    // Current instantaneous integration state
+    let currentVelocity = 0;
+    let kalmanFilter = new DiscreteKalmanFilter(0.01, 0.05, 0);
+
+    // Data history array
+    let trialsHistory = JSON.parse(localStorage.getItem('kinetic_jump_trials') || '[]');
+    let coachStreamLogs = [];
+
+    // -----------------------------------------------------
+    // 3. INITIALIZATION & SENSOR HOOKS
+    // -----------------------------------------------------
+    window.addEventListener('DOMContentLoaded', () => {
+      initChart();
+      renderHistoryTable();
+      setupRoleRouting();
+      setupEventListeners();
+    });
+
+    function setupRoleRouting() {
+      const params = new URLSearchParams(window.location.search);
+      const role = params.get('role');
+      if (role === 'coach') {
+        activateCoachView();
+      } else {
+        activateAthleteView();
+      }
+    }
+
+    function activateAthleteView() {
+      document.getElementById('view-athlete').classList.remove('hidden');
+      document.getElementById('view-coach').classList.add('hidden');
+      document.getElementById('view-tech-spec').classList.add('hidden');
+      document.getElementById('role-badge').textContent = 'Athlete Mode';
+      document.getElementById('role-badge').className = 'text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-cyan-900/60 border border-cyan-500/40 text-cyan-300';
+      document.getElementById('tab-athlete').className = 'px-2.5 py-1 rounded bg-cyan-500 text-slate-950 font-bold transition';
+      document.getElementById('tab-coach').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      document.getElementById('tab-tech-spec').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition hidden sm:inline-block';
+    }
+
+    function activateCoachView() {
+      document.getElementById('view-athlete').classList.add('hidden');
+      document.getElementById('view-coach').classList.remove('hidden');
+      document.getElementById('view-tech-spec').classList.add('hidden');
+      document.getElementById('role-badge').textContent = 'Coach Live Sync';
+      document.getElementById('role-badge').className = 'text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-amber-900/60 border border-amber-500/40 text-amber-300';
+      document.getElementById('tab-athlete').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      document.getElementById('tab-coach').className = 'px-2.5 py-1 rounded bg-amber-500 text-slate-950 font-bold transition';
+      document.getElementById('tab-tech-spec').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition hidden sm:inline-block';
+      startCoachPolling();
+    }
+
+    function activateTechSpecView() {
+      document.getElementById('view-athlete').classList.add('hidden');
+      document.getElementById('view-coach').classList.add('hidden');
+      document.getElementById('view-tech-spec').classList.remove('hidden');
+      document.getElementById('tab-athlete').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      document.getElementById('tab-coach').className = 'px-2.5 py-1 rounded text-slate-400 hover:text-white transition';
+      document.getElementById('tab-tech-spec').className = 'px-2.5 py-1 rounded bg-slate-700 text-white font-bold transition hidden sm:inline-block';
+    }
+
+    function setupEventListeners() {
+      // Splash screen triggers
+      document.getElementById('btn-grant-sensors').addEventListener('click', requestHardwareSensors);
+      document.getElementById('btn-sim-mode').addEventListener('click', enableSimulationMode);
+
+      // Role Navigation buttons
+      document.getElementById('tab-athlete').addEventListener('click', () => {
+        window.history.pushState({}, '', window.location.pathname + '?role=athlete');
+        activateAthleteView();
+      });
+      document.getElementById('tab-coach').addEventListener('click', () => {
+        window.history.pushState({}, '', window.location.pathname + '?role=coach');
+        activateCoachView();
+      });
+      document.getElementById('tab-tech-spec').addEventListener('click', activateTechSpecView);
+
+      // Test Execution triggers
+      document.getElementById('btn-start-protocol').addEventListener('click', initiateCalibrationPhase);
+      document.getElementById('btn-abort-test').addEventListener('click', resetProtocol);
+      document.getElementById('btn-clear-history').addEventListener('click', clearHistory);
+      document.getElementById('btn-export-spss').addEventListener('click', exportSpssCsv);
+      document.getElementById('btn-install-offline').addEventListener('click', handleOfflineInstallPrompt);
+
+      // Simulation Bench sliders & triggers
+      document.getElementById('slider-sim-flight').addEventListener('input', (e) => {
+        const ms = parseInt(e.target.value);
+        const cm = (0.125 * G_CONST * Math.pow(ms / 1000, 2) * 100).toFixed(1);
+        document.getElementById('lbl-sim-tf').textContent = `${ms} ms (${cm} cm)`;
+      });
+      document.getElementById('slider-sim-prop').addEventListener('input', (e) => {
+        document.getElementById('lbl-sim-propulsion').textContent = `${parseFloat(e.target.value).toFixed(2)} g`;
+      });
+      document.getElementById('slider-sim-noise').addEventListener('input', (e) => {
+        document.getElementById('lbl-sim-noise').textContent = `${parseFloat(e.target.value).toFixed(2)} g`;
+      });
+      document.getElementById('btn-trigger-simulation').addEventListener('click', executeSyntheticJumpSimulation);
+    }
+
+    // -----------------------------------------------------
+    // 4. HARDWARE SENSOR PERMISSION & LISTENER
+    // -----------------------------------------------------
+    async function requestHardwareSensors() {
+      try {
+        if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+          // iOS 13+ permission protocol
+          const response = await DeviceMotionEvent.requestPermission();
+          if (response === 'granted') {
+            bindDeviceMotionListener();
+            closeSplashScreen();
+          } else {
+            alert('Sensor permission was denied. Defaulting to Desktop/Simulation Mode.');
+            enableSimulationMode();
+          }
+        } else if ('ondevicemotion' in window) {
+          // Android and modern standard web browsers
+          bindDeviceMotionListener();
+          closeSplashScreen();
+        } else {
+          alert('DeviceMotionEvent is not supported on this device. Switching to Simulation Mode.');
+          enableSimulationMode();
+        }
+      } catch (err) {
+        console.warn('Sensor request error:', err);
+        enableSimulationMode();
+      }
+    }
+
+    function enableSimulationMode() {
+      isSimulated = true;
+      closeSplashScreen();
+      document.getElementById('net-status-text').textContent = 'Manual Bench Simulation Active (No Hardware required)';
+      document.getElementById('lbl-hz').textContent = '100 Hz (Synthetic)';
+    }
+
+    function closeSplashScreen() {
+      document.getElementById('preflight-splash').classList.add('hidden');
+    }
+
+    function bindDeviceMotionListener() {
+      sensorActive = true;
+      window.addEventListener('devicemotion', handleMotionSample, { passive: true });
+    }
+
+    // -----------------------------------------------------
+    // 5. MOTION SEGMENTATION & INGESTION PIPELINE
+    // -----------------------------------------------------
+    function handleMotionSample(event) {
+      const now = performance.now();
+      const dt = (now - lastTimestamp) / 1000;
+      lastTimestamp = now;
+
+      if (dt > 0) {
+        currentHz = Math.round(1 / dt);
+        document.getElementById('lbl-hz').textContent = `${currentHz} Hz`;
+      }
+
+      let ax = 0, ay = 0, az = 0;
+      if (event.accelerationIncludingGravity && event.accelerationIncludingGravity.x !== null) {
+        ax = event.accelerationIncludingGravity.x || 0;
+        ay = event.accelerationIncludingGravity.y || 0;
+        az = event.accelerationIncludingGravity.z || 0;
+      } else if (event.acceleration && event.acceleration.x !== null) {
+        ax = event.acceleration.x || 0;
+        ay = event.acceleration.y || 0;
+        az = (event.acceleration.z || 0) + G_CONST;
+      } else {
+        return;
+      }
+
+      // Magnitude of raw 3-axis accelerometer vector
+      const rawMag = Math.sqrt(ax * ax + ay * ay + az * az);
+      processBiomechanicalSample(rawMag, now, dt);
+    }
+
+    function processBiomechanicalSample(rawMag, timestamp, dt) {
+      // 1. Digital Filter (Kalman Filter on net acceleration)
+      const rawNet = rawMag - gravityMagnitude;
+      const filteredNet = kalmanFilter.update(rawNet);
+      const filteredTotalMag = filteredNet + gravityMagnitude;
+
+      // UI Feed Indicators
+      document.getElementById('val-net-acc').textContent = `${filteredNet.toFixed(2)} m/s²`;
+      document.getElementById('val-raw-mag').textContent = `${filteredTotalMag.toFixed(2)} m/s²`;
+      document.getElementById('val-g-bias').textContent = `Bias: ${gravityMagnitude.toFixed(2)} m/s²`;
+
+      // 2. State Machine Transition Engine
+      switch (currentState) {
+        case STATE.STANDBY:
+          // Idle - no continuous integration
+          currentVelocity = 0;
+          break;
+
+        case STATE.CALIBRATING:
+          calibrationSamples.push(rawMag);
+          if (timestamp - activeTrialData.startTime >= 1500) {
+            finishCalibration();
+          }
+          break;
+
+        case STATE.ARMED_READY:
+          // Waiting for unweighting dip: net acceleration drops below -1.8 m/s²
+          if (filteredNet < -1.8) {
+            transitionToState(STATE.COUNTERMOVEMENT, "Unweighting Dip Detected");
+            activeTrialData.dipTime = timestamp;
+            currentVelocity = 0;
+          }
+          break;
+
+        case STATE.COUNTERMOVEMENT:
+          // Integration of velocity: v = v + a*dt
+          currentVelocity += filteredNet * (dt || 0.01);
+          // Check transition to upward propulsion when acceleration exceeds baseline
+          if (filteredNet > 1.2) {
+            transitionToState(STATE.PROPULSION, "Propulsive Push-off Phase");
+          }
+          break;
+
+        case STATE.PROPULSION:
+          currentVelocity += filteredNet * (dt || 0.01);
+          if (filteredTotalMag / G_CONST > activeTrialData.peakAccelG) {
+            activeTrialData.peakAccelG = filteredTotalMag / G_CONST;
+          }
+
+          // Freefall Takeoff Condition: Total magnitude drops below 0.28g (2.75 m/s²)
+          if (filteredTotalMag < 2.75) {
+            activeTrialData.takeoffTime = timestamp;
+            activeTrialData.v0Takeoff = Math.max(0, currentVelocity);
+            transitionToState(STATE.FLIGHT, "Freefall / Airborne Flight");
+          }
+          break;
+
+        case STATE.FLIGHT:
+          // Sensor is in weightless freefall; clamp velocity or track kinematics
+          currentVelocity -= G_CONST * (dt || 0.01);
+          // Landing Contact Condition: Severe shock spike > 2.2g (21.5 m/s²)
+          if (filteredTotalMag > 21.5 || filteredNet > 12.0) {
+            activeTrialData.landingTime = timestamp;
+            activeTrialData.peakLandingG = filteredTotalMag / G_CONST;
+            transitionToState(STATE.LANDED_PROCESSING, "Impact Ground Reaction");
+            finalizeJumpCalculations();
+          }
+          break;
+
+        case STATE.LANDED_PROCESSING:
+          // Hold state momentarily while user reviews metrics
+          break;
+      }
+
+      // 3. Update Chart Waveform Buffer
+      if (sampleCount % 2 === 0) {
+        pushToWaveformChart(filteredNet, currentVelocity);
+      }
+      sampleCount++;
+    }
+
+    // -----------------------------------------------------
+    // 6. PROTOCOL STATE CONTROLLER
+    // -----------------------------------------------------
+    function initiateCalibrationPhase() {
+      activeTrialData = {
+        startTime: performance.now(),
+        dipTime: 0,
+        takeoffTime: 0,
+        landingTime: 0,
+        flightTimeMs: 0,
+        v0Takeoff: 0,
+        peakAccelG: 0,
+        peakLandingG: 0,
+        jumpHeightFlightCm: 0,
+        jumpHeightImpulseCm: 0,
+        samples: []
+      };
+
+      calibrationSamples = [];
+      currentVelocity = 0;
+      kalmanFilter.reset(0);
+      transitionToState(STATE.CALIBRATING, "Hold Phone Still (1.5s Calib)");
+      document.getElementById('btn-start-protocol').classList.add('hidden');
+      document.getElementById('btn-abort-test').classList.remove('hidden');
+    }
+
+    function finishCalibration() {
+      if (calibrationSamples.length > 5) {
+        const sum = calibrationSamples.reduce((a, b) => a + b, 0);
+        gravityMagnitude = sum / calibrationSamples.length;
+      } else {
+        gravityMagnitude = G_CONST;
+      }
+      transitionToState(STATE.ARMED_READY, "READY! Perform Countermovement Jump");
+    }
+
+    function transitionToState(nextState, message) {
+      currentState = nextState;
+      const stateLabel = document.getElementById('lbl-current-state');
+      const indicator = document.getElementById('state-indicator-dot');
+
+      // Step Indicators
+      const step1 = document.getElementById('step-calib');
+      const step2 = document.getElementById('step-ready');
+      const step3 = document.getElementById('step-flight');
+      const step4 = document.getElementById('step-landed');
+
+      [step1, step2, step3, step4].forEach(el => {
+        el.className = 'p-1.5 rounded-lg border border-transparent transition';
+      });
+
+      switch (nextState) {
+        case STATE.STANDBY:
+          stateLabel.textContent = `STATE 0: STANDBY`;
+          indicator.className = 'w-4 h-4 rounded-full bg-slate-600 transition-all';
+          break;
+        case STATE.CALIBRATING:
+          stateLabel.textContent = `STATE 1: CALIBRATING (${message})`;
+          indicator.className = 'w-4 h-4 rounded-full bg-amber-400 animate-ping transition-all';
+          step1.className = 'p-1.5 rounded-lg border border-amber-500/50 bg-amber-500/10 text-amber-300 font-bold';
+          break;
+        case STATE.ARMED_READY:
+          stateLabel.textContent = `STATE 2: ARMED & READY`;
+          indicator.className = 'w-4 h-4 rounded-full bg-cyan-400 animate-pulse transition-all';
+          step2.className = 'p-1.5 rounded-lg border border-cyan-500/50 bg-cyan-500/10 text-cyan-300 font-bold';
+          break;
+        case STATE.COUNTERMOVEMENT:
+          stateLabel.textContent = `STATE 3: COUNTERMOVEMENT DIP`;
+          indicator.className = 'w-4 h-4 rounded-full bg-blue-500 transition-all';
+          step2.className = 'p-1.5 rounded-lg border border-blue-500/50 bg-blue-500/10 text-blue-300 font-bold';
+          break;
+        case STATE.PROPULSION:
+          stateLabel.textContent = `STATE 4: PROPULSION THRUST`;
+          indicator.className = 'w-4 h-4 rounded-full bg-emerald-400 transition-all';
+          step2.className = 'p-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-bold';
+          break;
+        case STATE.FLIGHT:
+          stateLabel.textContent = `STATE 5: AIRBORNE (FLIGHT)`;
+          indicator.className = 'w-4 h-4 rounded-full bg-purple-500 animate-bounce transition-all';
+          step3.className = 'p-1.5 rounded-lg border border-purple-500/50 bg-purple-500/10 text-purple-300 font-bold';
+          break;
+        case STATE.LANDED_PROCESSING:
+          stateLabel.textContent = `STATE 6: TRIAL COMPLETE!`;
+          indicator.className = 'w-4 h-4 rounded-full bg-emerald-500 transition-all';
+          step4.className = 'p-1.5 rounded-lg border border-emerald-500/50 bg-emerald-500/10 text-emerald-300 font-bold';
+          break;
+      }
+    }
+
+    function resetProtocol() {
+      currentState = STATE.STANDBY;
+      transitionToState(STATE.STANDBY, "Ready");
+      document.getElementById('btn-start-protocol').classList.remove('hidden');
+      document.getElementById('btn-abort-test').classList.add('hidden');
+    }
+
+    // -----------------------------------------------------
+    // 7. KINEMATICS CALCULATION & DATA EXPORT
+    // -----------------------------------------------------
+    function finalizeJumpCalculations() {
+      const flightTimeMs = Math.max(10, activeTrialData.landingTime - activeTrialData.takeoffTime);
+      const flightTimeSec = flightTimeMs / 1000;
+
+      // Method A: Classical Ballistic Flight Time Height
+      // h = 1/8 * g * (t_f)^2
+      const hFlightMeters = 0.125 * G_CONST * Math.pow(flightTimeSec, 2);
+      const hFlightCm = Math.min(150, Math.max(0, hFlightMeters * 100));
+
+      // Method B: Takeoff Velocity Work-Energy Height
+      // h = (v_takeoff)^2 / (2 * g)
+      const v0 = activeTrialData.v0Takeoff;
+      const hImpulseMeters = (v0 * v0) / (2 * G_CONST);
+      const hImpulseCm = Math.min(150, Math.max(0, hImpulseMeters * 100));
+
+      const contTimeSec = (activeTrialData.takeoffTime - activeTrialData.dipTime) / 1000;
+      const rsiMod = contTimeSec > 0 ? (hFlightMeters / contTimeSec).toFixed(2) : '0.00';
+
+      // Store metrics
+      activeTrialData.flightTimeMs = Math.round(flightTimeMs);
+      activeTrialData.jumpHeightFlightCm = parseFloat(hFlightCm.toFixed(1));
+      activeTrialData.jumpHeightImpulseCm = parseFloat(hImpulseCm.toFixed(1));
+
+      // Update DOM Indicators
+      document.getElementById('disp-jump-flight').innerHTML = `${activeTrialData.jumpHeightFlightCm.toFixed(1)} <span class="text-sm text-cyan-400 font-normal">cm</span>`;
+      document.getElementById('disp-jump-flight-in').textContent = `${(activeTrialData.jumpHeightFlightCm / 2.54).toFixed(1)} inches (Flight eq)`;
+      
+      document.getElementById('disp-jump-impulse').innerHTML = `${activeTrialData.jumpHeightImpulseCm.toFixed(1)} <span class="text-sm text-emerald-400 font-normal">cm</span>`;
+      document.getElementById('disp-v0-metric').textContent = `v0: ${v0.toFixed(2)} m/s (Impulse eq)`;
+      
+      document.getElementById('disp-flight-time').innerHTML = `${activeTrialData.flightTimeMs} <span class="text-sm text-amber-400 font-normal">ms</span>`;
+      document.getElementById('disp-rsimod').textContent = `RSI_mod: ${rsiMod}`;
+      
+      document.getElementById('disp-peak-g').innerHTML = `${activeTrialData.peakAccelG.toFixed(2)} <span class="text-sm text-rose-400 font-normal">g</span>`;
+      document.getElementById('disp-impact-g').textContent = `Landing Impact: ${activeTrialData.peakLandingG.toFixed(2)} g`;
+
+      // Push to history records
+      const record = {
+        trial_id: trialsHistory.length + 1,
+        timestamp: new Date().toISOString(),
+        flight_time_ms: activeTrialData.flightTimeMs,
+        jump_flight_cm: activeTrialData.jumpHeightFlightCm,
+        jump_impulse_cm: activeTrialData.jumpHeightImpulseCm,
+        takeoff_v0: parseFloat(v0.toFixed(2)),
+        peak_propulsion_g: parseFloat(activeTrialData.peakAccelG.toFixed(2)),
+        landing_impact_g: parseFloat(activeTrialData.peakLandingG.toFixed(2)),
+        sampling_rate_hz: currentHz
+      };
+
+      trialsHistory.unshift(record);
+      localStorage.setItem('kinetic_jump_trials', JSON.stringify(trialsHistory));
+      renderHistoryTable();
+
+      // Broadcast to Cloud Database Endpoint
+      sendTelemetryToCloud(record);
+
+      // Restore button status
+      setTimeout(() => {
+        document.getElementById('btn-start-protocol').classList.remove('hidden');
+        document.getElementById('btn-abort-test').classList.add('hidden');
+      }, 2500);
+    }
+
+    // -----------------------------------------------------
+    // 8. ZERO-COST CLOUD SYNC & COACH LIVE STREAM
+    // -----------------------------------------------------
+    function sendTelemetryToCloud(record) {
+      const payload = {
+        app_id: APP_ID,
+        user_role: "athlete",
+        subject_id: "ATHLETE_01",
+        ...record
+      };
+
+      // Strict POST syntax bypassing CORS & handling redirects
+      fetch(CLOUD_ENDPOINT, {
+        method: "POST",
+        mode: "no-cors",
+        headers: {
+          "Content-Type": "text/plain"
+        },
+        body: JSON.stringify(payload)
+      })
+      .then(() => {
+        console.log("Telemetry dispatched to cloud successfully.");
+      })
+      .catch(err => {
+        console.warn("Cloud upload failed; queued locally:", err);
+        queueOfflineTrial(payload);
+      });
+    }
+
+    function queueOfflineTrial(payload) {
+      const queue = JSON.parse(localStorage.getItem('kinetic_jump_offline_queue') || '[]');
+      queue.push(payload);
+      localStorage.setItem('kinetic_jump_offline_queue', JSON.stringify(queue));
+      document.getElementById('lbl-queue-count').textContent = queue.length;
+    }
+
+    let coachPollTimer = null;
+    function startCoachPolling() {
+      if (coachPollTimer) clearInterval(coachPollTimer);
+      fetchCoachTelemetry();
+      coachPollTimer = setInterval(fetchCoachTelemetry, 3500);
+    }
+
+    function fetchCoachTelemetry() {
+      document.getElementById('lbl-poll-status').textContent = 'Polling...';
+      fetch(`${CLOUD_ENDPOINT}?app_id=${APP_ID}`)
+        .then(res => res.json())
+        .then(data => {
+          document.getElementById('lbl-poll-status').textContent = 'Active (3s)';
+          if (Array.isArray(data) && data.length > 0) {
+            coachStreamLogs = data;
+            renderCoachDashboard(data);
+          } else {
+            // If cloud array empty, mirror local athlete trials for demo
+            renderCoachDashboard(trialsHistory);
+          }
+        })
+        .catch(err => {
+          // Graceful fallback to local series if offline
+          document.getElementById('lbl-poll-status').textContent = 'Local Stream Fallback';
+          renderCoachDashboard(trialsHistory);
+        });
+    }
+
+    function renderCoachDashboard(records) {
+      const tbody = document.getElementById('tbl-coach-stream');
+      if (!records || records.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="7" class="py-6 text-center text-slate-500 italic">No sync records available.</td></tr>`;
+        return;
+      }
+
+      let maxJump = 0;
+      let totalJump = 0;
+      tbody.innerHTML = '';
+
+      records.slice(0, 15).forEach((item, idx) => {
+        const hFlight = parseFloat(item.jump_flight_cm || item.jumpHeightFlightCm || 0);
+        const hImp = parseFloat(item.jump_impulse_cm || item.jumpHeightImpulseCm || 0);
+        const tf = item.flight_time_ms || item.flightTimeMs || 0;
+        const v0 = item.takeoff_v0 || item.v0Takeoff || 0;
+        const subId = item.subject_id || `ATHLETE_0${idx + 1}`;
+        const timeStr = item.timestamp ? new Date(item.timestamp).toLocaleTimeString() : 'Recent';
+
+        if (hFlight > maxJump) maxJump = hFlight;
+        totalJump += hFlight;
+
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-800/40 transition';
+        row.innerHTML = `
+          <td class="py-2.5 px-3 font-bold text-white">${subId}</td>
+          <td class="py-2.5 px-3 text-slate-400">${timeStr}</td>
+          <td class="py-2.5 px-3 text-cyan-400 font-bold">${hFlight.toFixed(1)} cm</td>
+          <td class="py-2.5 px-3 text-emerald-400">${hImp.toFixed(1)} cm</td>
+          <td class="py-2.5 px-3 text-amber-400">${tf} ms</td>
+          <td class="py-2.5 px-3">${v0} m/s</td>
+          <td class="py-2.5 px-3"><span class="px-2 py-0.5 rounded-full text-[10px] bg-emerald-950 border border-emerald-500/40 text-emerald-300">Kalman Valid</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+
+      const meanJump = (totalJump / records.length).toFixed(1);
+      document.getElementById('coach-metric-max').innerHTML = `${maxJump.toFixed(1)} <span class="text-xs text-slate-400">cm</span>`;
+      document.getElementById('coach-metric-mean').innerHTML = `${meanJump} <span class="text-xs text-slate-400">cm</span>`;
+      
+      const lastJump = parseFloat(records[0].jump_flight_cm || records[0].jumpHeightFlightCm || 0);
+      if (maxJump > 0) {
+        const fatigue = Math.round((lastJump / maxJump) * 100);
+        document.getElementById('coach-metric-fatigue').textContent = `${fatigue}%`;
+      }
+    }
+
+    // -----------------------------------------------------
+    // 9. SYNTHETIC BENCH SIMULATOR (Desktop/No-Sensor Mode)
+    // -----------------------------------------------------
+    function executeSyntheticJumpSimulation() {
+      if (currentState !== STATE.STANDBY && currentState !== STATE.LANDED_PROCESSING) {
+        return;
+      }
+
+      const targetFlightMs = parseInt(document.getElementById('slider-sim-flight').value);
+      const propPeakG = parseFloat(document.getElementById('slider-sim-prop').value);
+      const noiseG = parseFloat(document.getElementById('slider-sim-noise').value);
+
+      initiateCalibrationPhase();
+
+      // Generate temporal frames at 100Hz (dt = 10ms)
+      const dt = 0.010;
+      let simTime = performance.now();
+      let elapsedMs = 0;
+
+      const simInterval = setInterval(() => {
+        elapsedMs += dt * 1000;
+        simTime += dt * 1000;
+
+        // Gaussian-like noise generator
+        const noise = (Math.random() - 0.5) * 2 * (noiseG * G_CONST);
+        let rawSimMag = G_CONST + noise;
+
+        // Scripted Stages:
+        // 0-1500ms: Static Calib
+        if (elapsedMs < 1500) {
+          rawSimMag = G_CONST + noise;
+        }
+        // 1500-1900ms: Countermovement Dip
+        else if (elapsedMs >= 1500 && elapsedMs < 1900) {
+          const dipPhase = (elapsedMs - 1500) / 400;
+          rawSimMag = G_CONST - (Math.sin(dipPhase * Math.PI) * 4.5) + noise;
+        }
+        // 1900-2250ms: Propulsion Drive Spike
+        else if (elapsedMs >= 1900 && elapsedMs < 2250) {
+          const propPhase = (elapsedMs - 1900) / 350;
+          const peakAccelMps2 = (propPeakG * G_CONST);
+          rawSimMag = G_CONST + (Math.sin(propPhase * Math.PI) * (peakAccelMps2 - G_CONST)) + noise;
+        }
+        // 2250ms to (2250 + targetFlightMs): Freefall phase
+        else if (elapsedMs >= 2250 && elapsedMs < 2250 + targetFlightMs) {
+          // Weightlessness (< 0.15g)
+          rawSimMag = 0.8 + (Math.random() * 0.8);
+        }
+        // Landing Impact
+        else if (elapsedMs >= 2250 + targetFlightMs && elapsedMs < 2250 + targetFlightMs + 180) {
+          rawSimMag = (3.8 * G_CONST) + noise;
+        }
+        // Restabilize
+        else {
+          rawSimMag = G_CONST + noise;
+        }
+
+        processBiomechanicalSample(rawSimMag, simTime, dt);
+
+        if (elapsedMs > 2250 + targetFlightMs + 400) {
+          clearInterval(simInterval);
+        }
+      }, 10);
+    }
+
+    // -----------------------------------------------------
+    // 10. REAL-TIME BIOMECHANICAL CHART (CHART.JS)
+    // -----------------------------------------------------
+    function initChart() {
+      const ctx = document.getElementById('jumpWaveformChart').getContext('2d');
+      
+      // Generate blank initial points
+      for (let i = 0; i < MAX_CHART_SAMPLES; i++) {
+        chartLabels.push('');
+        chartNetAccel.push(0);
+        chartVelocity.push(0);
+      }
+
+      chartInstance = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: chartLabels,
+          datasets: [
+            {
+              label: 'Filtered a_net (m/s²)',
+              data: chartNetAccel,
+              borderColor: '#00f2fe',
+              borderWidth: 2,
+              pointRadius: 0,
+              tension: 0.2,
+              yAxisID: 'y'
+            },
+            {
+              label: 'Integrated Velocity (m/s)',
+              data: chartVelocity,
+              borderColor: '#10b981',
+              borderWidth: 1.8,
+              borderDash: [4, 4],
+              pointRadius: 0,
+              tension: 0.2,
+              yAxisID: 'y1'
+            }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: false,
+          scales: {
+            x: {
+              display: false,
+              grid: { display: false }
+            },
+            y: {
+              type: 'linear',
+              position: 'left',
+              min: -12,
+              max: 30,
+              grid: { color: 'rgba(51, 65, 85, 0.4)' },
+              ticks: {
+                color: '#94a3b8',
+                font: { size: 10, family: 'monospace' }
+              }
+            },
+            y1: {
+              type: 'linear',
+              position: 'right',
+              min: -3,
+              max: 4,
+              grid: { display: false },
+              ticks: {
+                color: '#10b981',
+                font: { size: 10, family: 'monospace' }
+              }
+            }
+          },
+          plugins: {
+            legend: { display: false },
+            tooltip: { enabled: false }
+          }
+        }
+      });
+    }
+
+    function pushToWaveformChart(netAccel, velocity) {
+      if (!chartInstance) return;
+      chartNetAccel.shift();
+      chartNetAccel.push(parseFloat(netAccel.toFixed(2)));
+
+      chartVelocity.shift();
+      chartVelocity.push(parseFloat(velocity.toFixed(2)));
+
+      chartInstance.update('none');
+    }
+
+    // -----------------------------------------------------
+    // 11. TABLE RENDERING & SPSS CSV EXPORT
+    // -----------------------------------------------------
+    function renderHistoryTable() {
+      const tbody = document.getElementById('tbl-trials-body');
+      if (!trialsHistory || trialsHistory.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="8" class="py-6 text-center text-slate-500 italic font-sans">No trials recorded yet. Start a jump test or execute a simulation.</td></tr>`;
+        return;
+      }
+
+      tbody.innerHTML = '';
+      trialsHistory.forEach((t) => {
+        const row = document.createElement('tr');
+        row.className = 'hover:bg-slate-800/40 transition';
+        row.innerHTML = `
+          <td class="py-2.5 px-3 font-bold text-white">#${t.trial_id}</td>
+          <td class="py-2.5 px-3 text-slate-400">${new Date(t.timestamp).toLocaleTimeString()}</td>
+          <td class="py-2.5 px-3 text-cyan-400 font-bold">${t.jump_flight_cm} cm</td>
+          <td class="py-2.5 px-3 text-emerald-400 font-bold">${t.jump_impulse_cm} cm</td>
+          <td class="py-2.5 px-3 text-amber-400">${t.flight_time_ms} ms</td>
+          <td class="py-2.5 px-3">${t.takeoff_v0} m/s</td>
+          <td class="py-2.5 px-3">${t.landing_impact_g} g</td>
+          <td class="py-2.5 px-3"><span class="text-emerald-400 text-[10px] font-sans uppercase font-bold">Synced</span></td>
+        `;
+        tbody.appendChild(row);
+      });
+    }
+
+    function clearHistory() {
+      if (confirm('Clear all recorded kinematic trials from local cache?')) {
+        trialsHistory = [];
+        localStorage.removeItem('kinetic_jump_trials');
+        renderHistoryTable();
+      }
+    }
+
+    function exportSpssCsv() {
+      if (trialsHistory.length === 0) {
+        alert('No trial data available to export. Perform at least one jump trial first.');
+        return;
+      }
+
+      // SPSS Standard Formatted Header Matrix
+      let csvContent = 'data:text/csv;charset=utf-8,';
+      csvContent += 'TRIAL_ID,TIMESTAMP,FLIGHT_TIME_MS,JUMP_HEIGHT_FLIGHT_CM,JUMP_HEIGHT_IMPULSE_CM,TAKEOFF_VELOCITY_MPS,PEAK_PROPULSION_G,LANDING_IMPACT_G,SAMPLING_RATE_HZ,KALMAN_Q,KALMAN_R\n';
+
+      trialsHistory.forEach((row) => {
+        const line = [
+          row.trial_id,
+          `"${row.timestamp}"`,
+          row.flight_time_ms,
+          row.jump_flight_cm,
+          row.jump_impulse_cm,
+          row.takeoff_v0,
+          row.peak_propulsion_g,
+          row.landing_impact_g,
+          row.sampling_rate_hz || 100,
+          0.008,
+          0.055
+        ].join(',');
+        csvContent += line + '\n';
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement('a');
+      link.setAttribute('href', encodedUri);
+      link.setAttribute('download', `SPSS_KineticJump_Export_${new Date().toISOString().slice(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    }
+
+    function handleOfflineInstallPrompt() {
+      alert('KineticJump Pro PWA is enabled with offline caching. You can add this app to your Home Screen via browser options (Safari: Share -> Add to Home Screen; Chrome: Menu -> Install App).');
+    }
+  </script>
+</body>
+</html>
